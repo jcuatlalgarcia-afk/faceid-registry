@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FaceID Registry - Sistema Escolar</title>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { background-color: #f4f7fe; padding: 25px; text-align: center; color: #2b3674; }
+        h1 { font-size: 2.2rem; color: #1b2559; margin-bottom: 5px; }
+        p.subtitle { color: #707ebe; font-size: 1rem; margin-bottom: 25px; }
+        
+        /* Dashboard Stats */
+        .stats-container { display: flex; justify-content: center; gap: 20px; max-width: 1100px; margin: 0 auto 25px auto; flex-wrap: wrap; }
+        .stat-card { background: white; padding: 18px 30px; border-radius: 14px; box-shadow: 0px 5px 15px rgba(0,0,0,0.04); min-width: 220px; text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: bold; color: #7c3aed; }
+        .stat-label { font-size: 0.85rem; color: #707ebe; font-weight: 600; text-transform: uppercase; margin-top: 4px; }
+
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; max-width: 1100px; margin: 0 auto; }
+        .card { background: white; border-radius: 16px; box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.05); overflow: hidden; display: flex; flex-direction: column; text-align: left; }
+        .card-header { padding: 18px; color: white; }
+        .card-body { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .card-title { font-size: 1.25rem; font-weight: bold; }
+        .card-desc { color: #707ebe; font-size: 0.9rem; margin-bottom: 15px; }
+        .btn { border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; width: 100%; text-align: center; }
+        
+        .c-green { background: #10b981; } .c-purple { background: #9333ea; }
+        .c-blue { background: #3b82f6; } .c-orange { background: #f97316; }
+        .c-teal { background: #14b8a6; } .c-emerald { background: #059669; }
+        .btn-purple { background: #7c3aed; color: white; } .btn-light { background: #f4f7fe; color: #1b2559; }
+        .btn-purple:disabled { background: #c4b5fd; cursor: not-allowed; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; border-radius: 16px; width: 90%; max-width: 580px; padding: 25px; text-align: left; position: relative; max-height: 90vh; overflow-y: auto; }
+        .modal-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; color: #1b2559; }
+        .close-btn { position: absolute; top: 15px; right: 20px; font-size: 1.5rem; cursor: pointer; color: #8f9bba; }
+        
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: #2b3674; font-weight: 600; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #e0e5f2; border-radius: 8px; font-size: 0.9rem; }
+        
+        .camera-box { position: relative; width: 100%; height: 260px; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 15px; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        
+        .status-msg { font-size: 0.85rem; font-weight: bold; margin-bottom: 12px; text-align: center; padding: 10px; border-radius: 8px; }
+        .status-msg.error { color: #ef4444; background: #fee2e2; }
+        .status-msg.success { color: #10b981; background: #d1fae5; }
+        .status-msg.info { color: #3b82f6; background: #dbeafe; }
+        .status-msg.warning { color: #d97706; background: #fef3c7; }
+
+        .user-card { display: flex; gap: 15px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 10px; margin-top: 10px; align-items: center; }
+        .user-card img { width: 55px; height: 55px; border-radius: 8px; object-fit: cover; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #e2e8f0; padding: 10px; font-size: 0.85rem; text-align: left; }
+        th { background: #f8fafc; color: #1b2559; }
+        .btn-danger { background: #ef4444; color: white; padding: 5px 10px; border-radius: 6px; font-size: 0.75rem; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h1>FaceID Registry</h1>
+    <p class="subtitle">Sistema de Control Escolar e Identificación Facial</p>
+
+    <!-- Métricas en vivo -->
+    <div class="stats-container">
+        <div class="stat-card">
+            <div id="statPersonas" class="stat-number">0</div>
+            <div class="stat-label">Personas Registradas</div>
+        </div>
+        <div class="stat-card">
+            <div id="statClases" class="stat-number">0</div>
+            <div class="stat-label">Clases Activas</div>
+        </div>
+        <div class="stat-card">
+            <div id="statAsistencias" class="stat-number">0</div>
+            <div class="stat-label">Asistencias Hoy</div>
+        </div>
+    </div>
+
+    <!-- Módulos Principales -->
+    <div class="grid-container">
+        <div class="card"><div class="card-header c-green"><span class="card-title">Registrar Persona</span></div><div class="card-body"><p class="card-desc">Alta de alumnos o profesores con descriptor de rostro.</p><button class="btn btn-purple" onclick="openRegisterModal()">Registrar</button></div></div>
+        <div class="card"><div class="card-header c-purple"><span class="card-title">Identificar Persona</span></div><div class="card-body"><p class="card-desc">Escanear rostro en tiempo real para verificar datos.</p><button class="btn btn-light" onclick="openIdentifyModal()">Identificar</button></div></div>
+        <div class="card"><div class="card-header c-blue"><span class="card-title">Ver Registros</span></div><div class="card-body"><p class="card-desc">Consulta la lista general de personas con buscador rápido.</p><button class="btn btn-light" onclick="openRecordsModal()">Ver Tabla</button></div></div>
+        <div class="card"><div class="card-header c-orange"><span class="card-title">Registrar Clase</span></div><div class="card-body"><p class="card-desc">Configurar materia, docente, horario y minutos de tolerancia.</p><button class="btn btn-light" onclick="openClassModal()">Nueva Clase</button></div></div>
+        <div class="card"><div class="card-header c-teal"><span class="card-title">Tomar Asistencia</span></div><div class="card-body"><p class="card-desc">Pase de lista automatizado con validación de sonrisa.</p><button class="btn btn-light" onclick="openAttendanceModal()">Iniciar</button></div></div>
+        <div class="card"><div class="card-header c-emerald"><span class="card-title">Respaldo Excel</span></div><div class="card-body"><p class="card-desc">Descarga un archivo .xlsx con el historial completo.</p><button class="btn btn-light" onclick="descargarExcel()">Descargar</button></div></div>
+    </div>
+
+    <!-- Modal Registrar Persona -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeRegisterModal()">&times;</span>
+            <div class="modal-title">Registrar Nueva Persona</div>
+            <div class="form-group"><label>Nombre Completo</label><input type="text" id="regNombre" placeholder="Ej. Juan Pérez"></div>
+            <div class="form-group"><label>Matrícula / ID</label><input type="text" id="regMatricula" placeholder="Ej. 2024001"></div>
+            <div class="form-group">
+                <label>Rol</label>
+                <select id="regRol"><option value="Alumno">Alumno</option><option value="Profesor">Profesor</option></select>
+            </div>
+            <div class="camera-box"><video id="videoReg" autoplay muted playsinline></video></div>
+            <div id="statusMsgReg" class="status-msg info">Cargando modelos de IA...</div>
+            <button id="btnCapturar" class="btn btn-purple" onclick="capturarYGuardar()" disabled>Capturar y Guardar</button>
+        </div>
+    </div>
+
+    <!-- Modal Identificar Persona -->
+    <div id="identifyModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeIdentifyModal()">&times;</span>
+            <div class="modal-title">Identificación en Tiempo Real</div>
+            <div class="camera-box"><video id="videoIdentify" autoplay muted playsinline></video></div>
+            <div id="statusMsgIdentify" class="status-msg info">Iniciando escáner...</div>
+            <div id="identifiedUser"></div>
+        </div>
+    </div>
+
+    <!-- Modal Ver Registros -->
+    <div id="recordsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeRecordsModal()">&times;</span>
+            <div class="modal-title">Catálogo de Personas</div>
+            <input type="text" id="searchBox" placeholder="Buscar por nombre o matrícula..." oninput="filtrarTabla()" style="width:100%; padding:10px; margin-bottom:12px; border-radius:8px; border:1px solid #e0e5f2;">
+            <div style="max-height: 350px; overflow-y: auto;">
+                <table>
+                    <thead><tr><th>Foto</th><th>Nombre</th><th>Matrícula</th><th>Rol</th><th>Acción</th></tr></thead>
+                    <tbody id="recordsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Registrar Clase -->
+    <div id="classModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeClassModal()">&times;</span>
+            <div class="modal-title">Registrar Nueva Clase</div>
+            <div class="form-group"><label>Profesor</label><input type="text" id="clsMaestro" placeholder="Nombre del docente"></div>
+            <div class="form-group"><label>Materia</label><input type="text" id="clsMateria" placeholder="Ej. Programación Web"></div>
+            <div class="form-group"><label>Grado y Grupo</label>
+                <div style="display:flex; gap:10px;"><input type="text" id="clsGrado" placeholder="Ej. 4"><input type="text" id="clsGrupo" placeholder="Ej. A"></div>
+            </div>
+            <div class="form-group"><label>Hora de Entrada</label><input type="time" id="clsEntrada"></div>
+            <div class="form-group"><label>Tolerancia (Minutos)</label><input type="number" id="clsTolerancia" value="10"></div>
+            <button class="btn btn-purple" onclick="guardarClase()">Guardar Clase</button>
+        </div>
+    </div>
+
+    <!-- Modal Tomar Asistencia -->
+    <div id="attendanceModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeAttendanceModal()">&times;</span>
+            <div class="modal-title">Tomar Asistencia (Con Prueba de Vida)</div>
+            <div class="form-group"><label>Selecciona la Clase</label><select id="selectClase"></select></div>
+            <div class="camera-box"><video id="videoAttendance" autoplay muted playsinline></video></div>
+            <div id="statusMsgAttendance" class="status-msg warning">SONRÍE frente a la cámara para activar el botón.</div>
+            <button id="btnMarcarAsistencia" class="btn btn-purple" onclick="registrarAsistenciaFace()" disabled>Verificar y Registrar</button>
+        </div>
+    </div>
+
+    <script>
+        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+        let modelsLoaded = false, streamReg = null, streamIdentify = null, streamAtt = null, identifyInterval = null, livenessInterval = null;
+        let personasCache = [];
+
+        async function cargarMetricas() {
+            try {
+                const res = await fetch('/api/metricas');
+                const data = await res.json();
+                document.getElementById('statPersonas').innerText = data.total_personas;
+                document.getElementById('statClases').innerText = data.total_clases;
+                document.getElementById('statAsistencias').innerText = data.asistencias_hoy;
+            } catch(e) { console.error("Error al cargar métricas", e); }
+        }
+
+        window.onload = cargarMetricas;
+
+        async function loadModels() {
+            if (modelsLoaded) return;
+            await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+            modelsLoaded = true;
+        }
+
+        async function openRegisterModal() {
+            document.getElementById('registerModal').style.display = 'flex';
+            try { streamReg = await navigator.mediaDevices.getUserMedia({ video: {} }); document.getElementById('videoReg').srcObject = streamReg; } catch(e){}
+            await loadModels();
+            document.getElementById('statusMsgReg').innerText = "Modelos listos. Enfoca tu rostro.";
+            document.getElementById('btnCapturar').disabled = false;
+        }
+        function closeRegisterModal() { document.getElementById('registerModal').style.display = 'none'; if(streamReg) streamReg.getTracks().forEach(t=>t.stop()); }
+
+        async function capturarYGuardar() {
+            const nombre = document.getElementById('regNombre').value.trim();
+            const matricula = document.getElementById('regMatricula').value.trim();
+            const rol = document.getElementById('regRol').value;
+            
+            if(!nombre || !matricula) return alert("Por favor completa los campos de Nombre y Matrícula.");
+
+            const video = document.getElementById('videoReg');
+            const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+            if(!detection) return alert("Rostro no detectado. Por favor enfoca bien la cámara.");
+
+            const canvas = document.createElement('canvas'); canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+
+            const res = await fetch('/api/registrar_persona', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ nombre_completo: nombre, matricula: matricula, rol: rol, fotografia: canvas.toDataURL('image/jpeg'), descriptor: JSON.stringify(Array.from(detection.descriptor)) })
+            });
+            const data = await res.json();
+            alert(data.message); 
+            if(data.status==='ok') { closeRegisterModal(); cargarMetricas(); }
+        }
+
+        async function openIdentifyModal() {
+            document.getElementById('identifyModal').style.display = 'flex';
+            streamIdentify = await navigator.mediaDevices.getUserMedia({ video: {} });
+            document.getElementById('videoIdentify').srcObject = streamIdentify;
+            await loadModels();
+
+            const personas = await (await fetch('/api/obtener_personas')).json();
+            if(!personas.length) {
+                document.getElementById('statusMsgIdentify').innerText = "No hay personas registradas en la base de datos.";
+                return;
+            }
+            const faceMatcher = new faceapi.FaceMatcher(personas.map(p => new faceapi.LabeledFaceDescriptors(p.id.toString(), [new Float32Array(JSON.parse(p.descriptor))])), 0.6);
+
+            identifyInterval = setInterval(async () => {
+                const detection = await faceapi.detectSingleFace(document.getElementById('videoIdentify')).withFaceLandmarks().withFaceDescriptor();
+                const status = document.getElementById('statusMsgIdentify');
+                if(!detection) { status.innerText = "Buscando rostro..."; return; }
+                const match = faceMatcher.findBestMatch(detection.descriptor);
+                if(match.label !== 'unknown') {
+                    const p = personas.find(x => x.id.toString() === match.label);
+                    status.innerText = "¡Persona Identificada!";
+                    document.getElementById('identifiedUser').innerHTML = `<div class="user-card"><img src="${p.fotografia}"><div><strong>${p.nombre_completo}</strong><br>Rol: ${p.rol}<br>Matrícula: ${p.matricula}</div></div>`;
+                } else { 
+                    status.innerText = "Rostro no reconocido en el catálogo"; 
+                    document.getElementById('identifiedUser').innerHTML = ''; 
+                }
+            }, 1000);
+        }
+        function closeIdentifyModal() { document.getElementById('identifyModal').style.display = 'none'; clearInterval(identifyInterval); if(streamIdentify) streamIdentify.getTracks().forEach(t=>t.stop()); }
+
+        async function openRecordsModal() {
+            document.getElementById('recordsModal').style.display = 'flex';
+            document.getElementById('searchBox').value = '';
+            try {
+                const res = await fetch('/api/obtener_personas');
+                personasCache = await res.json();
+                renderTabla(personasCache);
+            } catch (err) {
+                console.error("Error al obtener personas:", err);
+            }
+        }
+
+        function renderTabla(lista) {
+            const tbody = document.getElementById('recordsTableBody');
+            if (!lista || lista.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 15px;">No se encontraron personas registradas</td></tr>';
+                return;
+            }
+
+            let html = '';
+            for (let i = 0; i < lista.length; i++) {
+                const p = lista[i];
+                const foto = p.fotografia || '';
+                const nombre = p.nombre_completo || 'Sin nombre';
+                const matricula = p.matricula || 'Sin matrícula';
+                const rol = p.rol || 'Alumno';
+                const id = p.id;
+
+                html += '<tr>' +
+                    '<td><img src="' + foto + '" width="35" height="35" style="border-radius:4px; object-fit:cover;"></td>' +
+                    '<td>' + nombre + '</td>' +
+                    '<td>' + matricula + '</td>' +
+                    '<td>' + rol + '</td>' +
+                    '<td><button class="btn-danger" onclick="eliminarPersona(' + id + ')">Borrar</button></td>' +
+                '</tr>';
+            }
+            tbody.innerHTML = html;
+        }
+
+        function filtrarTabla() {
+            const txt = document.getElementById('searchBox').value.toLowerCase().trim();
+            if (!txt) {
+                renderTabla(personasCache);
+                return;
+            }
+            const filtrados = personasCache.filter(function(p) {
+                const nombre = String(p.nombre_completo || '').toLowerCase();
+                const matricula = String(p.matricula || '').toLowerCase();
+                return nombre.includes(txt) || matricula.includes(txt);
+            });
+            renderTabla(filtrados);
+        }
+
+        function closeRecordsModal() { document.getElementById('recordsModal').style.display = 'none'; }
+
+        async function eliminarPersona(id) { 
+            if(confirm("¿Seguro que deseas eliminar a esta persona?")) {
+                await fetch(`/api/eliminar_persona/${id}`, { method: 'DELETE' }); 
+                openRecordsModal(); 
+                cargarMetricas(); 
+            }
+        }
+
+        function openClassModal() { document.getElementById('classModal').style.display = 'flex'; }
+        function closeClassModal() { document.getElementById('classModal').style.display = 'none'; }
+        async function guardarClase() {
+            const maestro = document.getElementById('clsMaestro').value.trim();
+            const materia = document.getElementById('clsMateria').value.trim();
+            const entrada = document.getElementById('clsEntrada').value;
+            if(!maestro || !materia || !entrada) return alert("Por favor llena los campos requeridos.");
+
+            const payload = {
+                maestro: maestro, materia: materia,
+                grado: document.getElementById('clsGrado').value, grupo: document.getElementById('clsGrupo').value,
+                hora_entrada: entrada, hora_salida: '23:59', tolerancia: document.getElementById('clsTolerancia').value
+            };
+            await fetch('/api/registrar_clase', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            alert("Clase guardada correctamente."); closeClassModal(); cargarMetricas();
+        }
+
+        async function openAttendanceModal() {
+            document.getElementById('attendanceModal').style.display = 'flex';
+            const clases = await (await fetch('/api/obtener_clases')).json();
+            const select = document.getElementById('selectClase');
+            
+            if(!clases.length) {
+                select.innerHTML = '<option value="">No hay clases registradas</option>';
+                alert("Primero debes dar de alta al menos una clase.");
+                closeAttendanceModal();
+                return;
+            }
+
+            select.innerHTML = clases.map(c => `<option value="${c.id}">${c.materia} - Prof. ${c.maestro} (${c.grado}°${c.grupo})</option>`).join('');
+            
+            streamAtt = await navigator.mediaDevices.getUserMedia({ video: {} });
+            document.getElementById('videoAttendance').srcObject = streamAtt;
+            await loadModels();
+
+            livenessInterval = setInterval(async () => {
+                const video = document.getElementById('videoAttendance');
+                const detection = await faceapi.detectSingleFace(video).withFaceExpressions();
+                const status = document.getElementById('statusMsgAttendance');
+                const btn = document.getElementById('btnMarcarAsistencia');
+
+                if (detection && detection.expressions.happy > 0.45) {
+                    status.innerText = "¡Sonrisa detectada! Prueba de vida superada.";
+                    status.className = "status-msg success";
+                    btn.disabled = false;
+                } else {
+                    status.innerText = "SONRÍE frente a la cámara para activar el botón.";
+                    status.className = "status-msg warning";
+                    btn.disabled = true;
+                }
+            }, 800);
+        }
+
+        function closeAttendanceModal() {
+            document.getElementById('attendanceModal').style.display = 'none';
+            clearInterval(livenessInterval);
+            if(streamAtt) streamAtt.getTracks().forEach(t=>t.stop());
+        }
+
+        async function registrarAsistenciaFace() {
+            const claseId = document.getElementById('selectClase').value;
+            const video = document.getElementById('videoAttendance');
+            const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+            if(!detection) return alert("Rostro no detectado.");
+
+            const personas = await (await fetch('/api/obtener_personas')).json();
+            const faceMatcher = new faceapi.FaceMatcher(personas.map(p => new faceapi.LabeledFaceDescriptors(p.id.toString(), [new Float32Array(JSON.parse(p.descriptor))])), 0.6);
+            const match = faceMatcher.findBestMatch(detection.descriptor);
+
+            if(match.label === 'unknown') return alert("Persona no identificada en el sistema.");
+
+            const canvas = document.createElement('canvas'); canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+
+            const res = await fetch('/api/tomar_asistencia', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ clase_id: claseId, persona_id: match.label, foto_verificacion: canvas.toDataURL('image/jpeg') })
+            });
+            const data = await res.json();
+            alert(data.message); closeAttendanceModal(); cargarMetricas();
+        }
+
+        function descargarExcel() { window.location.href = '/api/exportar_excel'; }
+    </script>
+</body>
+</html>
