@@ -27,6 +27,17 @@ def init_db():
                 descriptor TEXT NOT NULL
             )
         ''')
+        # Dentro de tu función de inicialización de la BD en app.py:
+with sqlite3.connect('tu_base_de_datos.db') as conn:
+    cursor = conn.cursor()
+    
+    # Intenta agregar la columna rol por si la BD antigua no la tiene
+    try:
+        cursor.execute("ALTER TABLE personas ADD COLUMN rol TEXT DEFAULT 'Usuario'")
+        conn.commit()
+    except sqlite3.OperationalError:
+        # La columna ya existe, ignora el error
+        pass
         conn.execute('''
             CREATE TABLE IF NOT EXISTS clases (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
